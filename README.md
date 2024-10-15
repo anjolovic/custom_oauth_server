@@ -40,7 +40,7 @@ sequenceDiagram
     Client->>OAuthController: Revoke Token Request
     OAuthController->>Models: Revoke Token
     OAuthController->>Client: Token Revoked Confirmation
-
+```
 
 ## Detailed Process Description
 
