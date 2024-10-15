@@ -2,224 +2,138 @@
 
 ## Overview
 
-This Rails application implements a custom OAuth 2.0 authorization server. It provides authentication and authorization services for client applications, focusing on user verification and session management. The server supports multiple identity providers and offers a flexible, secure OAuth 2.0 implementation.
+This Rails application implements a custom OAuth 2.0 authorization server. It provides authentication and authorization services for client applications, focusing on secure token management and flexible OAuth 2.0 flows.
 
 ## Key Components
 
 1. OAuthController
-2. TokenValidator
-3. AuthenticationServiceRetriever
-4. TokenResponseGenerator
-5. SessionRefresher
-6. UserCodeMapCreator
-7. ServiceAccountAccessTokenJwtEncoder
-8. UserVerifier
-9. OAuthClient (Model)
-10. OAuthAccessToken (Model)
-11. OAuthRefreshToken (Model)
-12. User (Model)
+2. OAuthTokenValidator (Middleware)
+3. ErrorHandler (Concern)
+4. OAuthClient (Model)
+5. OAuthAccessToken (Model)
+6. OAuthRefreshToken (Model)
+7. AuthorizationCode (Model)
+8. Scope (Model)
+9. User (Model)
 
 ## Authentication Flow
 
-```mermaid
+mermaid
 sequenceDiagram
-    participant Client
-    participant OAuthController
-    participant AuthenticationServiceRetriever
-    participant UserCodeMapCreator
-    participant TokenResponseGenerator
-    participant SessionRefresher
-    participant TokenValidator
+participant Client
+participant OAuthController
+participant OAuthTokenValidator
+participant Models
+Client->>OAuthController: Authorization Request
+OAuthController->>Models: Validate Client
+OAuthController->>Client: Authorization Code
+Client->>OAuthController: Token Request
+OAuthController->>Models: Validate Authorization Code
+OAuthController->>Client: Access & Refresh Tokens
+Client->>OAuthController: API Request with Access Token
+OAuthController->>OAuthTokenValidator: Validate Token
+OAuthTokenValidator->>OAuthController: Token Valid
+OAuthController->>Client: API Response
+Client->>OAuthController: Refresh Token Request
+OAuthController->>Models: Validate Refresh Token
+OAuthController->>Client: New Access Token
+Client->>OAuthController: Revoke Token Request
+OAuthController->>Models: Revoke Token
+OAuthController->>Client: Token Revoked Confirmation
 
-    Client->>OAuthController: Authorization Request
-    OAuthController->>AuthenticationServiceRetriever: Select Auth Service
-    OAuthController->>Client: Redirect to Auth Service
-    Client->>OAuthController: Callback with Auth Code
-    OAuthController->>UserCodeMapCreator: Create Login Code
-    OAuthController->>Client: Return Login Code
-    Client->>OAuthController: Token Request
-    OAuthController->>TokenResponseGenerator: Generate Tokens
-    TokenResponseGenerator->>Client: Return Access & Refresh Tokens
-    Client->>OAuthController: API Request with Access Token
-    OAuthController->>TokenValidator: Validate Token
-    TokenValidator->>OAuthController: Token Valid
-    OAuthController->>Client: API Response
-    Client->>OAuthController: Refresh Token Request
-    OAuthController->>SessionRefresher: Refresh Session
-    SessionRefresher->>Client: New Access Token
-    Client->>OAuthController: Logout Request
-    OAuthController->>Client: Logout Response
-
-```
 
 ## Detailed Process Description
 
 ### 1. Authorization Request
+- Client initiates the flow by sending a request to `/api/v1/oauth/authorize`.
+- OAuthController validates the client and generates an authorization code.
 
-- The client initiates the flow by sending an authorization request to the `/oauth/authorize` endpoint.
-- The `OAuthController#authorize` method handles this request.
-- It validates the parameters (client_id, redirect_uri, response_type, ACR, operation).
-- Creates a state token using `StatePayloadJwtEncoder`.
-- Selects the appropriate authentication service using `AuthenticationServiceRetriever`.
+### 2. Token Request
+- Client exchanges the authorization code for tokens at `/api/v1/oauth/token`.
+- OAuthController validates the code and issues access and refresh tokens.
 
-### 2. Authentication
+### 3. API Access
+- Client uses the access token to make authenticated requests.
+- OAuthTokenValidator middleware validates the token for each request.
 
-- The user is redirected to the selected authentication service.
-- The user authenticates with the service.
-- The service redirects back to the callback URL.
-
-### 3. Callback Handling
-
-- The `OAuthController#callback` method processes the callback.
-- It validates the callback parameters and decodes the state token.
-- Retrieves user information from the authentication service.
-- Creates a login code using `UserCodeMapCreator`.
-- The `UserVerifier` is used to find or create a `UserVerification` record.
-
-### 4. Token Request
-
-- The client exchanges the login code for tokens using the `/oauth/token` endpoint.
-- `OAuthController#token` handles this request.
-- `TokenResponseGenerator` creates the access and refresh tokens.
-- For service accounts, `ServiceAccountAccessTokenJwtEncoder` is used to encode the access token as a JWT.
-
-### 5. Token Validation
-
-- Protected API endpoints use the `TokenValidator` middleware.
-- It extracts the access token from the Authorization header.
-- Validates the token's authenticity and expiration.
-
-### 6. Token Refresh
-
+### 4. Token Refresh
 - When the access token expires, the client can use the refresh token to get a new access token.
-- The `/oauth/refresh` endpoint handles this request.
-- `SessionRefresher` validates the refresh token and creates new tokens.
+- This is handled by the token endpoint with a 'refresh_token' grant type.
 
-### 7. Logout
-
-- The `/oauth/revoke` endpoint handles logout requests.
-- It revokes the session and redirects the user if necessary.
+### 5. Token Revocation
+- Clients can revoke tokens using the `/api/v1/oauth/revoke` endpoint.
 
 ## Key Classes and Their Responsibilities
 
 ### OAuthController
-
-- Handles all OAuth-related endpoints (authorize, callback, token, refresh, revoke, logout).
+- Handles all OAuth-related endpoints (authorize, token, revoke).
 - Manages the overall flow of the OAuth process.
 
-### TokenValidator
-
-- Middleware for validating access tokens on protected routes.
+### OAuthTokenValidator (Middleware)
+- Validates access tokens for protected routes.
 - Checks token authenticity and expiration.
 
-### AuthenticationServiceRetriever
-
-- Selects the appropriate authentication service based on the login type.
-- Supports multiple identity providers.
-
-### TokenResponseGenerator
-
-- Generates access and refresh tokens.
-- Supports different grant types: authorization code, JWT bearer, and token exchange.
-
-### SessionRefresher
-
-- Handles token refresh process.
-- Validates the refresh token and creates new access and refresh tokens.
-
-### UserCodeMapCreator
-
-- Creates a login code after successful authentication.
-- Manages user verification and terms of use acceptance.
-
-### ServiceAccountAccessTokenJwtEncoder
-
-- Encodes service account access tokens as JWTs.
-- Includes claims like issuer, audience, subject, expiration time, and scopes.
-
-### UserVerifier
-
-- Finds or creates UserVerification records.
-- Manages the relationship between user verifications and user accounts.
-- Handles different types of identifiers (e.g., email, ID from external providers).
+### ErrorHandler (Concern)
+- Centralizes error handling for OAuth-related errors.
+- Provides consistent error responses across the application.
 
 ### OAuthClient (Model)
-
-- Represents OAuth clients (applications) authorized to use the OAuth server.
+- Represents OAuth clients authorized to use the OAuth server.
 - Stores client_id, client_secret, and redirect_uri.
 
 ### OAuthAccessToken (Model)
-
 - Represents access tokens issued to clients.
 - Includes token string, expiration time, and associations to client and user.
 
 ### OAuthRefreshToken (Model)
-
 - Represents refresh tokens issued to clients.
 - Used to obtain new access tokens without re-authentication.
 
+### AuthorizationCode (Model)
+- Represents temporary authorization codes used in the OAuth flow.
+
+### Scope (Model)
+- Manages the available scopes for access control.
+
 ### User (Model)
-
 - Represents end-users of the system.
-- Includes authentication logic (e.g., has_secure_password).
-
-## Client Configuration
-
-Client configurations are managed through the `OAuthClient` model. This system allows for detailed and flexible configuration of OAuth clients, including:
-
-- Token durations
-- Redirect URIs
-- Authentication types
-- Shared session settings
-- Enforced terms of use
-- Service levels
-- Supported credential service providers
+- Includes authentication logic and associations with tokens.
 
 ## Security Measures
 
-1. PKCE (Proof Key for Code Exchange) support for enhanced security with public clients.
-2. Anti-CSRF tokens to prevent CSRF attacks.
-3. JWT encoding for service account access tokens.
-4. Refresh token rotation to detect and prevent token theft.
-5. Rate limiting to prevent abuse (using rack-attack).
-6. CORS configuration to control cross-origin requests.
+1. PKCE (Proof Key for Code Exchange) support for public clients.
+2. JWT encoding for access tokens (to be implemented).
+3. Refresh token rotation (to be implemented).
+4. Rate limiting using rack-attack (configured in config/initializers/rack_attack.rb).
+5. CORS configuration to control cross-origin requests (configured in config/initializers/cors.rb).
 
 ## Error Handling
 
-Custom error classes are used throughout the application to handle various error scenarios. These are defined in the `OAuth::Errors` module.
+Custom error handling is implemented through the ErrorHandler concern, providing consistent error responses for OAuth-related issues.
 
-## Logging and Monitoring
+## Configuration
 
-A custom logger is used to log important events throughout the authentication process. Consider implementing additional monitoring as the application scales.
+- CORS settings: config/initializers/cors.rb
+- Rack Attack settings: config/initializers/rack_attack.rb
 
 ## Future Enhancements
 
-1. Implement support for additional grant types.
-2. Enhance scope support for more fine-grained access control.
-3. Implement additional security measures like dynamic client registration.
-4. Add support for federated identity providers.
-5. Implement more comprehensive analytics and monitoring.
+1. Implement JWT encoding for access tokens.
+2. Add refresh token rotation for enhanced security.
+3. Implement additional grant types (e.g., client credentials, password).
+4. Enhance scope support for more fine-grained access control.
+5. Add support for dynamic client registration.
 
 ## Related Files
 
-- `app/controllers/oauth_controller.rb`
-- `app/services/authentication_service_retriever.rb`
-- `app/services/token_response_generator.rb`
-- `app/services/session_refresher.rb`
-- `app/services/user_code_map_creator.rb`
-- `app/services/service_account_access_token_jwt_encoder.rb`
-- `app/services/user_verifier.rb`
-- `app/models/oauth_client.rb`
-- `app/models/oauth_access_token.rb`
-- `app/models/oauth_refresh_token.rb`
-- `app/models/user.rb`
-- `app/middleware/token_validator.rb`
-- `config/routes.rb`
-
-## Getting Started
-
-1. Clone the repository
-2. Run `bundle install` to install dependencies
-3. Set up the database with `rails db:create db:migrate`
-4. Configure your OAuth clients in the database
-5. Start the server with `rails server`
+- app/controllers/api/v1/oauth_controller.rb
+- app/middleware/oauth_token_validator.rb
+- app/controllers/concerns/error_handler.rb
+- app/models/o_auth_client.rb
+- app/models/o_auth_access_token.rb
+- app/models/o_auth_refresh_token.rb
+- app/models/authorization_code.rb
+- app/models/scope.rb
+- app/models/user.rb
+- config/routes.rb
+- config/initializers/cors.rb
