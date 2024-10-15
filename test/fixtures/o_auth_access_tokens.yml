@@ -1,13 +1,26 @@
-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+# == Schema Information
+#
+# Table name: o_auth_access_tokens
+#
+#  id               :integer          not null, primary key
+#  token            :string
+#  expires_at       :datetime
+#  scopes           :json
+#  o_auth_client_id :integer          not null
+#  user_id          :integer          not null
+#  revoked_at       :datetime
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#
 
 one:
-  token: MyString
-  expires_at: 2024-10-09 09:27:16
-  oauth_client: one
+  token: access_token_1
+  expires_at: <%= 1.hour.from_now %>
+  o_auth_client: one
   user: one
 
 two:
-  token: MyString
-  expires_at: 2024-10-09 09:27:16
-  oauth_client: two
+  token: access_token_2
+  expires_at: <%= 1.hour.from_now %>
+  o_auth_client: two
   user: two

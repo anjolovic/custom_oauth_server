@@ -1,13 +1,24 @@
-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+# == Schema Information
+#
+# Table name: o_auth_clients
+#
+#  id            :integer          not null, primary key
+#  name          :string
+#  client_id     :string
+#  client_secret :string
+#  redirect_uri  :string
+#  created_at    :datetime         not null
+#  updated_at    :datetime         not null
+#
 
 one:
-  name: MyString
-  client_id: MyString
-  client_secret: MyString
-  redirect_uri: MyString
+  name: Client One
+  client_id: unique_client_id_1
+  client_secret: unique_secret_1
+  redirect_uri: https://example1.com/callback
 
 two:
-  name: MyString
-  client_id: MyString
-  client_secret: MyString
-  redirect_uri: MyString
+  name: Client Two
+  client_id: unique_client_id_2
+  client_secret: unique_secret_2
+  redirect_uri: https://example2.com/callback
