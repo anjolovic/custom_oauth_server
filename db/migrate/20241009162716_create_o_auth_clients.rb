@@ -8,5 +8,6 @@ class CreateOAuthClients < ActiveRecord::Migration[8.0]
 
       t.timestamps
     end
+    add_index :o_auth_clients, :client_id, unique: true
   end
 end
