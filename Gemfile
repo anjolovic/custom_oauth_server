@@ -16,6 +16,7 @@ gem "jbuilder"
 gem "bcrypt"
 gem "jwt"
 gem "rack-cors"
+gem "rack-attack"
 
 # Deployment
 gem "kamal", ">= 2.0.0.rc2", require: false
@@ -30,4 +31,5 @@ group :development, :test do
   # Code quality and security
   gem "brakeman", require: false
   gem "rubocop-rails-omakase", require: false
+  gem "annotate"
 end

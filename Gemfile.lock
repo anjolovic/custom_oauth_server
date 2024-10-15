@@ -72,6 +72,9 @@ GEM
       securerandom (>= 0.3)
       tzinfo (~> 2.0, >= 2.0.5)
       uri (>= 0.13.1)
+    annotate (3.2.0)
+      activerecord (>= 3.2, < 8.0)
+      rake (>= 10.4, < 14.0)
     ast (2.4.2)
     base64 (0.2.0)
     bcrypt (3.1.20)
@@ -172,6 +175,8 @@ GEM
     raabro (1.4.0)
     racc (1.8.1)
     rack (3.1.7)
+    rack-attack (6.7.0)
+      rack (>= 1.0, < 4)
     rack-cors (2.0.2)
       rack (>= 2.0.0)
     rack-session (2.0.0)
@@ -295,6 +300,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  annotate
   bcrypt
   bootsnap
   brakeman
@@ -303,6 +309,7 @@ DEPENDENCIES
   jwt
   kamal (>= 2.0.0.rc2)
   puma (>= 5.0)
+  rack-attack
   rack-cors
   rails (~> 8.0.0.beta1)
   rubocop-rails-omakase
