@@ -18,28 +18,28 @@ This Rails application implements a custom OAuth 2.0 authorization server. It pr
 
 ## Authentication Flow
 
-mermaid
+```mermaid
 sequenceDiagram
-participant Client
-participant OAuthController
-participant OAuthTokenValidator
-participant Models
-Client->>OAuthController: Authorization Request
-OAuthController->>Models: Validate Client
-OAuthController->>Client: Authorization Code
-Client->>OAuthController: Token Request
-OAuthController->>Models: Validate Authorization Code
-OAuthController->>Client: Access & Refresh Tokens
-Client->>OAuthController: API Request with Access Token
-OAuthController->>OAuthTokenValidator: Validate Token
-OAuthTokenValidator->>OAuthController: Token Valid
-OAuthController->>Client: API Response
-Client->>OAuthController: Refresh Token Request
-OAuthController->>Models: Validate Refresh Token
-OAuthController->>Client: New Access Token
-Client->>OAuthController: Revoke Token Request
-OAuthController->>Models: Revoke Token
-OAuthController->>Client: Token Revoked Confirmation
+    participant Client
+    participant OAuthController
+    participant OAuthTokenValidator
+    participant Models
+    Client->>OAuthController: Authorization Request
+    OAuthController->>Models: Validate Client
+    OAuthController->>Client: Authorization Code
+    Client->>OAuthController: Token Request
+    OAuthController->>Models: Validate Authorization Code
+    OAuthController->>Client: Access & Refresh Tokens
+    Client->>OAuthController: API Request with Access Token
+    OAuthController->>OAuthTokenValidator: Validate Token
+    OAuthTokenValidator->>OAuthController: Token Valid
+    OAuthController->>Client: API Response
+    Client->>OAuthController: Refresh Token Request
+    OAuthController->>Models: Validate Refresh Token
+    OAuthController->>Client: New Access Token
+    Client->>OAuthController: Revoke Token Request
+    OAuthController->>Models: Revoke Token
+    OAuthController->>Client: Token Revoked Confirmation
 
 
 ## Detailed Process Description
