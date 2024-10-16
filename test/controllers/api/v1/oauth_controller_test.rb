@@ -6,17 +6,17 @@ class Api::V1::OauthControllerTest < ActionDispatch::IntegrationTest
     @user = users(:one)
     @scope = Scope.create!(name: "read", description: "Read access")
     @code_verifier = SecureRandom.hex(32)
-    @code_challenge = Base64.urlsafe_encode64(Digest::SHA256.digest(@code_verifier)).tr('=', '')
+    @code_challenge = Base64.urlsafe_encode64(Digest::SHA256.digest(@code_verifier)).tr("=", "")
   end
 
   test "should get authorization code" do
     get api_v1_oauth_authorize_url, params: {
       client_id: @client.client_id,
       redirect_uri: @client.redirect_uri,
-      response_type: 'code',
-      scope: 'read',
+      response_type: "code",
+      scope: "read",
       code_challenge: @code_challenge,
-      code_challenge_method: 'S256'
+      code_challenge_method: "S256"
     }
     assert_response :redirect
     assert_match /code=/, @response.location
@@ -32,11 +32,11 @@ class Api::V1::OauthControllerTest < ActionDispatch::IntegrationTest
       expires_at: 10.minutes.from_now,
       code_challenge: @code_challenge,
       code_challenge_method: "S256",
-      scopes: ["read"]
+      scopes: [ "read" ]
     )
 
     post api_v1_oauth_token_url, params: {
-      grant_type: 'authorization_code',
+      grant_type: "authorization_code",
       code: auth_code.code,
       client_id: @client.client_id,
       client_secret: @client.client_secret,
@@ -45,8 +45,8 @@ class Api::V1::OauthControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :success
-    assert_not_nil JSON.parse(@response.body)['access_token']
-    assert_not_nil JSON.parse(@response.body)['refresh_token']
+    assert_not_nil JSON.parse(@response.body)["access_token"]
+    assert_not_nil JSON.parse(@response.body)["refresh_token"]
   end
 
   test "should refresh token" do
@@ -55,18 +55,18 @@ class Api::V1::OauthControllerTest < ActionDispatch::IntegrationTest
       o_auth_client: @client,
       user: @user,
       expires_at: 30.days.from_now,
-      scopes: ["read"]
+      scopes: [ "read" ]
     )
 
     post api_v1_oauth_token_url, params: {
-      grant_type: 'refresh_token',
+      grant_type: "refresh_token",
       refresh_token: refresh_token.token,
       client_id: @client.client_id,
       client_secret: @client.client_secret
     }
 
     assert_response :success
-    assert_not_nil JSON.parse(@response.body)['access_token']
+    assert_not_nil JSON.parse(@response.body)["access_token"]
   end
 
   test "should revoke token" do

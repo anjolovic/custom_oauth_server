@@ -1,13 +1,13 @@
 module Api
-# Brief explanation:
-# This OauthController handles the core OAuth flows:
-# authorization code grant, refresh token, and client credentials. The controller includes methods for
-# authorizing clients, issuing tokens, refreshing tokens, and revoking tokens. It also implements security
-# features like PKCE (Proof Key for Code Exchange) and scope validation. The controller uses JWT (JSON Web Tokens)
-# for access tokens, providing a stateless authentication mechanism. This implementation allows applications
-# to securely authenticate and authorize users or other applications, following OAuth 2.0 standards and best practices.
+  # Brief explanation:
+  # This OauthController handles the core OAuth flows:
+  # authorization code grant, refresh token, and client credentials. The controller includes methods for
+  # authorizing clients, issuing tokens, refreshing tokens, and revoking tokens. It also implements security
+  # features like PKCE (Proof Key for Code Exchange) and scope validation. The controller uses JWT (JSON Web Tokens)
+  # for access tokens, providing a stateless authentication mechanism. This implementation allows applications
+  # to securely authenticate and authorize users or other applications, following OAuth 2.0 standards and best practices.
   module V1
-    class OauthController < ActionController::API 
+    class OauthController < ActionController::API
       # Handles the authorization request
       def authorize
         client = OAuthClient.find_by(client_id: params[:client_id])
@@ -20,14 +20,14 @@ module Api
             redirect_uri: params[:redirect_uri],
             expires_at: 10.minutes.from_now,
             code_challenge: params[:code_challenge],
-            code_challenge_method: params[:code_challenge_method] || 'plain',
-            scopes: params[:scope]&.split(' ') || []
+            code_challenge_method: params[:code_challenge_method] || "plain",
+            scopes: params[:scope]&.split(" ") || []
           )
 
           # Use redirect_to with allow_other_host: true
           redirect_to "#{params[:redirect_uri]}?code=#{auth_code.code}", allow_other_host: true
         else
-          render json: { error: 'Invalid client or redirect URI' }, status: :unauthorized
+          render json: { error: "Invalid client or redirect URI" }, status: :unauthorized
         end
       end
 
@@ -37,14 +37,14 @@ module Api
         return unless client
 
         case params[:grant_type]
-        when 'authorization_code'
+        when "authorization_code"
           handle_authorization_code(client)
-        when 'refresh_token'
+        when "refresh_token"
           handle_refresh_token(client)
-        when 'client_credentials'
+        when "client_credentials"
           handle_client_credentials(client)
         else
-          render json: { error: 'Unsupported grant type' }, status: :bad_request
+          render json: { error: "Unsupported grant type" }, status: :bad_request
         end
       end
 
@@ -55,7 +55,7 @@ module Api
           token.update!(revoked_at: Time.current)
           head :ok
         else
-          render json: { error: 'Token not found' }, status: :not_found
+          render json: { error: "Token not found" }, status: :not_found
         end
       end
 
@@ -66,13 +66,13 @@ module Api
           # Verify PKCE
           if auth_code.code_challenge.present?
             unless verify_code_verifier(auth_code.code_challenge, params[:code_verifier], auth_code.code_challenge_method)
-              return render json: { error: 'Invalid code verifier' }, status: :unauthorized
+              return render json: { error: "Invalid code verifier" }, status: :unauthorized
             end
           end
 
-          requested_scopes = params[:scope]&.split(' ') || []
+          requested_scopes = params[:scope]&.split(" ") || []
           unless validate_scopes(requested_scopes)
-            return render json: { error: 'Invalid scopes requested' }, status: :bad_request
+            return render json: { error: "Invalid scopes requested" }, status: :bad_request
           end
 
           user = auth_code.user
@@ -95,13 +95,13 @@ module Api
           jwt_token = generate_jwt(user, auth_code.scopes)
           render json: {
             access_token: jwt_token,
-            token_type: 'Bearer',
+            token_type: "Bearer",
             expires_in: 3600,
             refresh_token: refresh_token.token,
-            scope: auth_code.scopes.join(' ')
+            scope: auth_code.scopes.join(" ")
           }
         else
-          render json: { error: 'Invalid authorization code' }, status: :unauthorized
+          render json: { error: "Invalid authorization code" }, status: :unauthorized
         end
       end
 
@@ -120,13 +120,13 @@ module Api
 
           render json: {
             access_token: access_token.token,
-            token_type: 'Bearer',
+            token_type: "Bearer",
             expires_in: access_token.expires_in,
             refresh_token: refresh_token.token,
-            scope: access_token.scopes.join(' ')
+            scope: access_token.scopes.join(" ")
           }
         else
-          render json: { error: 'Invalid refresh token' }, status: :unauthorized
+          render json: { error: "Invalid refresh token" }, status: :unauthorized
         end
       end
 
@@ -137,24 +137,24 @@ module Api
           expires_at: 1.hour.from_now,
           o_auth_client: client,
           user: nil,
-          scopes: params[:scope]&.split(' ') || []
+          scopes: params[:scope]&.split(" ") || []
         )
 
         render json: {
           access_token: access_token.token,
-          token_type: 'Bearer',
+          token_type: "Bearer",
           expires_in: access_token.expires_in,
-          scope: access_token.scopes.join(' ')
+          scope: access_token.scopes.join(" ")
         }
       end
 
       # Verifies the code verifier for PKCE
       def verify_code_verifier(challenge, verifier, method)
         case method
-        when 'plain'
+        when "plain"
           challenge == verifier
-        when 'S256'
-          challenge == Base64.urlsafe_encode64(Digest::SHA256.digest(verifier)).tr('=', '')
+        when "S256"
+          challenge == Base64.urlsafe_encode64(Digest::SHA256.digest(verifier)).tr("=", "")
         else
           false
         end
@@ -173,7 +173,7 @@ module Api
           scopes: scopes,
           exp: 1.hour.from_now.to_i
         }
-        JWT.encode(payload, Rails.application.credentials.secret_key_base, 'HS256')
+        JWT.encode(payload, Rails.application.credentials.secret_key_base, "HS256")
       end
 
       def login
@@ -195,24 +195,24 @@ module Api
             last_name: user.last_name
           }
         else
-          render json: { error: 'Unauthorized' }, status: :unauthorized
+          render json: { error: "Unauthorized" }, status: :unauthorized
         end
       end
 
       # Handles logout
       def logout
-        token = request.headers['Authorization']&.split(' ')&.last
+        token = request.headers["Authorization"]&.split(" ")&.last
         if token
           access_token = OAuthAccessToken.find_by(token: token)
           if access_token
             access_token.revoke!
             OAuthRefreshToken.where(user: access_token.user, o_auth_client: access_token.o_auth_client).update_all(revoked_at: Time.current)
-            render json: { message: 'Logged out successfully' }
+            render json: { message: "Logged out successfully" }
           else
-            render json: { error: 'Invalid token' }, status: :unauthorized
+            render json: { error: "Invalid token" }, status: :unauthorized
           end
         else
-          render json: { error: 'No token provided' }, status: :bad_request
+          render json: { error: "No token provided" }, status: :bad_request
         end
       end
 
@@ -224,7 +224,7 @@ module Api
         if client && client.authenticate(params[:client_secret])
           client
         else
-          render json: { error: 'Invalid client credentials' }, status: :unauthorized
+          render json: { error: "Invalid client credentials" }, status: :unauthorized
           nil
         end
       end
@@ -238,10 +238,10 @@ module Api
       # Verifies the code verifier for PKCE
       def verify_code_verifier(challenge, verifier, method)
         case method
-        when 'plain'
+        when "plain"
           challenge == verifier
-        when 'S256'
-          challenge == Base64.urlsafe_encode64(Digest::SHA256.digest(verifier)).tr('=', '')
+        when "S256"
+          challenge == Base64.urlsafe_encode64(Digest::SHA256.digest(verifier)).tr("=", "")
         else
           false
         end
@@ -260,7 +260,7 @@ module Api
           scopes: scopes,
           exp: 1.hour.from_now.to_i
         }
-        JWT.encode(payload, Rails.application.credentials.secret_key_base, 'HS256')
+        JWT.encode(payload, Rails.application.credentials.secret_key_base, "HS256")
       end
 
       def login

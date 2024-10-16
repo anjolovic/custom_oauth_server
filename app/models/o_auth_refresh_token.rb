@@ -13,7 +13,7 @@
 #  updated_at       :datetime         not null
 #
 class OAuthRefreshToken < ApplicationRecord
-  belongs_to :o_auth_client, class_name: 'OAuthClient'
+  belongs_to :o_auth_client, class_name: "OAuthClient"
   belongs_to :user
 
   before_create :set_expiration
