@@ -10,6 +10,9 @@ class Api::V1::OauthControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should get authorization code" do
+    # Ensure we have a valid client and user
+    @client.update!(redirect_uri: "https://example.com/callback")
+    
     get api_v1_oauth_authorize_url, params: {
       client_id: @client.client_id,
       redirect_uri: @client.redirect_uri,
@@ -18,6 +21,7 @@ class Api::V1::OauthControllerTest < ActionDispatch::IntegrationTest
       code_challenge: @code_challenge,
       code_challenge_method: "S256"
     }
+    
     assert_response :redirect
     assert_match /code=/, @response.location
     assert_redirected_to %r{\A#{@client.redirect_uri}}, allow_other_host: true

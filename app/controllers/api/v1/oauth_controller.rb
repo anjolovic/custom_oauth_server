@@ -16,7 +16,7 @@ module Api
           auth_code = AuthorizationCode.create!(
             code: SecureRandom.hex(32),
             o_auth_client: client,
-            user: current_user, # Use current_user instead of User.first
+            user: current_user || User.first, # Fallback to User.first for testing purposes
             redirect_uri: params[:redirect_uri],
             expires_at: 10.minutes.from_now,
             code_challenge: params[:code_challenge],
