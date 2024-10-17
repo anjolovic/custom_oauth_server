@@ -16,7 +16,7 @@ module Api
           auth_code = AuthorizationCode.create!(
             code: SecureRandom.hex(32),
             o_auth_client: client,
-            user: User.first, # TODO: Replace with actual user authentication
+            user: current_user, # Use current_user instead of User.first
             redirect_uri: params[:redirect_uri],
             expires_at: 10.minutes.from_now,
             code_challenge: params[:code_challenge],
@@ -177,12 +177,23 @@ module Api
       end
 
       def login
-        # Render a login page or redirect to an external authentication service
-        # This could be a simple form or integration with services like Google, Apple, or Login.gov
+        user = User.find_by(email: params[:email])
+        if user&.authenticate(params[:password])
+          jwt_token = generate_jwt(user, ["read", "write"])
+          render json: { token: jwt_token }
+        else
+          render json: { error: "Invalid email or password" }, status: :unauthorized
+        end
       end
 
       def create_account
-        # Render a page for creating a new account
+        user = User.new(user_params)
+        if user.save
+          jwt_token = generate_jwt(user, ["read", "write"])
+          render json: { token: jwt_token }, status: :created
+        else
+          render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+        end
       end
 
       def user_info
@@ -231,8 +242,15 @@ module Api
 
       # Authenticates the request
       def authenticate_request
-        # Implement token-based authentication
-        # Return the user if authenticated, nil otherwise
+        token = request.headers["Authorization"]&.split(" ")&.last
+        return nil unless token
+
+        begin
+          decoded_token = JWT.decode(token, Rails.application.credentials.secret_key_base, true, algorithm: "HS256")
+          User.find(decoded_token[0]["sub"])
+        rescue JWT::DecodeError
+          nil
+        end
       end
 
       # Verifies the code verifier for PKCE
@@ -263,13 +281,12 @@ module Api
         JWT.encode(payload, Rails.application.credentials.secret_key_base, "HS256")
       end
 
-      def login
-        # Render a login page or redirect to an external authentication service
-        # This could be a simple form or integration with services like Google, Apple, or Login.gov
+      def user_params
+        params.require(:user).permit(:email, :password, :password_confirmation, :first_name, :last_name)
       end
 
-      def create_account
-        # Render a page for creating a new account
+      def current_user
+        @current_user ||= authenticate_request
       end
     end
   end
