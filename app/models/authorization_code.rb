@@ -15,8 +15,8 @@
 #  updated_at            :datetime         not null
 #
 class AuthorizationCode < ApplicationRecord
-  belongs_to :o_auth_client  # The client application that requested the authorization
-  belongs_to :user          # The user who granted the authorization
+  belongs_to :user
+  belongs_to :o_auth_client
 
   validates :code, presence: true, uniqueness: true
   validates :redirect_uri, :expires_at, :code_challenge, :code_challenge_method, presence: true

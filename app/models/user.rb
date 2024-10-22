@@ -9,8 +9,9 @@
 #  updated_at      :datetime         not null
 #
 class User < ApplicationRecord
-  has_many :oauth_access_tokens
-  has_many :oauth_refresh_tokens
+  has_many :o_auth_access_tokens, dependent: :destroy
+  has_many :o_auth_refresh_tokens, dependent: :destroy
+  has_many :authorization_codes, dependent: :destroy
 
   validates :email, presence: true, uniqueness: true
   validates :first_name, presence: true
