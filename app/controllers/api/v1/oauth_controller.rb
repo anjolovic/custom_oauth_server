@@ -1,30 +1,21 @@
 module Api
-  # Brief explanation:
-  # This OauthController handles the core OAuth flows:
-  # authorization code grant, refresh token, and client credentials. The controller includes methods for
-  # authorizing clients, issuing tokens, refreshing tokens, and revoking tokens. It also implements security
-  # features like PKCE (Proof Key for Code Exchange) and scope validation. The controller uses JWT (JSON Web Tokens)
-  # for access tokens, providing a stateless authentication mechanism. This implementation allows applications
-  # to securely authenticate and authorize users or other applications, following OAuth 2.0 standards and best practices.
   module V1
     class OauthController < ActionController::API
       # Handles the authorization request
+      # Creates an authorization code if the client and redirect URI are valid
       def authorize
         client = OAuthClient.find_by(client_id: params[:client_id])
         if client && params[:redirect_uri] == client.redirect_uri
-          # Generate and store an authorization code
           auth_code = AuthorizationCode.create!(
             code: SecureRandom.hex(32),
             o_auth_client: client,
-            user: current_user || User.first, # Fallback to User.first for testing purposes
+            user: current_user || User.first,
             redirect_uri: params[:redirect_uri],
             expires_at: 10.minutes.from_now,
             code_challenge: params[:code_challenge],
             code_challenge_method: params[:code_challenge_method] || "plain",
             scopes: params[:scope]&.split(" ") || []
           )
-
-          # Use redirect_to with allow_other_host: true
           redirect_to "#{params[:redirect_uri]}?code=#{auth_code.code}", allow_other_host: true
         else
           render json: { error: "Invalid client or redirect URI" }, status: :unauthorized
@@ -32,6 +23,7 @@ module Api
       end
 
       # Handles token requests
+      # Supports authorization_code, refresh_token, and client_credentials grant types
       def token
         client = authenticate_client
         return unless client
@@ -48,7 +40,7 @@ module Api
         end
       end
 
-      # Revokes a token
+      # Revokes the given access or refresh token
       def revoke
         token = OAuthAccessToken.find_by(token: params[:token]) || OAuthRefreshToken.find_by(token: params[:token])
         if token
@@ -60,10 +52,10 @@ module Api
       end
 
       # Handles the authorization code grant type
+      # Verifies the code and creates access and refresh tokens
       def handle_authorization_code(client)
         auth_code = AuthorizationCode.find_by(code: params[:code])
         if auth_code && !auth_code.expired? && auth_code.o_auth_client_id == client.id
-          # Verify PKCE
           if auth_code.code_challenge.present?
             unless verify_code_verifier(auth_code.code_challenge, params[:code_verifier], auth_code.code_challenge_method)
               return render json: { error: "Invalid code verifier" }, status: :unauthorized
@@ -106,24 +98,35 @@ module Api
       end
 
       # Handles the refresh token grant type
+      # Verifies the refresh token and creates a new access token
       def handle_refresh_token(client)
-        refresh_token = OAuthRefreshToken.find_by(token: params[:refresh_token])
-        if refresh_token && !refresh_token.revoked? && refresh_token.o_auth_client_id == client.id
+        refresh_token = params[:refresh_token] || params.dig(:oauth, :refresh_token) || request.headers['HTTP_REFRESH_TOKEN']
+        
+        if refresh_token.blank?
+          render json: { error: "Refresh token is missing" }, status: :bad_request
+          return
+        end
+
+        oauth_refresh_token = OAuthRefreshToken.find_by(token: refresh_token)
+        
+        if oauth_refresh_token && !oauth_refresh_token.revoked? && oauth_refresh_token.o_auth_client_id == client.id
+          user = oauth_refresh_token.user
           access_token = OAuthAccessToken.create!(
             token: SecureRandom.hex(32),
             expires_at: 1.hour.from_now,
             o_auth_client: client,
-            user: refresh_token.user,
-            scopes: refresh_token.scopes
+            user: user,
+            scopes: oauth_refresh_token.scopes
           )
-          refresh_token.update!(expires_at: 30.days.from_now)
+          oauth_refresh_token.update!(expires_at: 30.days.from_now)
 
+          jwt_token = generate_jwt(user, oauth_refresh_token.scopes)
           render json: {
-            access_token: access_token.token,
+            access_token: jwt_token,
             token_type: "Bearer",
-            expires_in: access_token.expires_in,
-            refresh_token: refresh_token.token,
-            scope: access_token.scopes.join(" ")
+            expires_in: 3600,
+            refresh_token: oauth_refresh_token.token,
+            scope: oauth_refresh_token.scopes.join(" ")
           }
         else
           render json: { error: "Invalid refresh token" }, status: :unauthorized
@@ -131,6 +134,7 @@ module Api
       end
 
       # Handles the client credentials grant type
+      # Creates an access token for the client
       def handle_client_credentials(client)
         access_token = OAuthAccessToken.create!(
           token: SecureRandom.hex(32),
@@ -148,34 +152,8 @@ module Api
         }
       end
 
-      # Verifies the code verifier for PKCE
-      def verify_code_verifier(challenge, verifier, method)
-        case method
-        when "plain"
-          challenge == verifier
-        when "S256"
-          challenge == Base64.urlsafe_encode64(Digest::SHA256.digest(verifier)).tr("=", "")
-        else
-          false
-        end
-      end
-
-      # Validates the requested scopes
-      def validate_scopes(requested_scopes)
-        available_scopes = Scope.pluck(:name)
-        requested_scopes.all? { |scope| available_scopes.include?(scope) }
-      end
-
-      # Generates a JWT token
-      def generate_jwt(user, scopes)
-        payload = {
-          sub: user.id,
-          scopes: scopes,
-          exp: 1.hour.from_now.to_i
-        }
-        JWT.encode(payload, Rails.application.credentials.secret_key_base, "HS256")
-      end
-
+      # Handles user login
+      # Authenticates the user and returns a JWT token
       def login
         user = User.find_by(email: params[:email])
         if user&.authenticate(params[:password])
@@ -186,6 +164,8 @@ module Api
         end
       end
 
+      # Handles user account creation
+      # Creates a new user and returns a JWT token
       def create_account
         user = User.new(user_params)
         if user.save
@@ -196,8 +176,8 @@ module Api
         end
       end
 
+      # Returns user information for the authenticated user
       def user_info
-        # Ensure the user is authenticated
         user = authenticate_request
         if user
           render json: {
@@ -210,7 +190,8 @@ module Api
         end
       end
 
-      # Handles logout
+      # Handles user logout
+      # Revokes the access token and associated refresh tokens
       def logout
         token = request.headers["Authorization"]&.split(" ")&.last
         if token
@@ -229,7 +210,7 @@ module Api
 
       private
 
-      # Authenticates the client
+      # Authenticates the OAuth client
       def authenticate_client
         client = OAuthClient.find_by(client_id: params[:client_id])
         if client && client.authenticate(params[:client_secret])
@@ -240,16 +221,17 @@ module Api
         end
       end
 
-      # Authenticates the request
+      # Authenticates the request using the JWT token in the Authorization header
       def authenticate_request
-        token = request.headers["Authorization"]&.split(" ")&.last
-        return nil unless token
-
-        begin
-          decoded_token = JWT.decode(token, Rails.application.credentials.secret_key_base, true, algorithm: "HS256")
-          User.find(decoded_token[0]["sub"])
-        rescue JWT::DecodeError
-          nil
+        auth_header = request.headers['Authorization']
+        if auth_header
+          token = auth_header.split(' ').last
+          begin
+            decoded_token = JWT.decode(token, Rails.application.secret_key_base, true, { algorithm: 'HS256' })
+            User.find(decoded_token[0]['sub'])
+          rescue JWT::DecodeError, ActiveRecord::RecordNotFound
+            nil
+          end
         end
       end
 
@@ -265,26 +247,28 @@ module Api
         end
       end
 
-      # Validates the requested scopes
+      # Validates the requested scopes against available scopes
       def validate_scopes(requested_scopes)
         available_scopes = Scope.pluck(:name)
         requested_scopes.all? { |scope| available_scopes.include?(scope) }
       end
 
-      # Generates a JWT token
+      # Generates a JWT token for the given user and scopes
       def generate_jwt(user, scopes)
         payload = {
           sub: user.id,
           scopes: scopes,
           exp: 1.hour.from_now.to_i
         }
-        JWT.encode(payload, Rails.application.credentials.secret_key_base, "HS256")
+        JWT.encode(payload, Rails.application.secret_key_base, "HS256")
       end
 
+      # Permits only specific user parameters for account creation
       def user_params
         params.require(:user).permit(:email, :password, :password_confirmation, :first_name, :last_name)
       end
 
+      # Returns the current authenticated user
       def current_user
         @current_user ||= authenticate_request
       end
