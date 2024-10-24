@@ -51,6 +51,64 @@ module Api
         end
       end
 
+      # Handles user login
+      # Authenticates the user and returns a JWT token
+      def login
+        user = User.find_by(email: params[:email])
+        if user&.authenticate(params[:password])
+          jwt_token = generate_jwt(user, ["read", "write"])
+          render json: { token: jwt_token }
+        else
+          render json: { error: "Invalid email or password" }, status: :unauthorized
+        end
+      end
+
+      # Handles user account creation
+      # Creates a new user and returns a JWT token
+      def create_account
+        user = User.new(user_params)
+        if user.save
+          jwt_token = generate_jwt(user, ["read", "write"])
+          render json: { token: jwt_token }, status: :created
+        else
+          render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+        end
+      end
+
+      # Returns user information for the authenticated user
+      def user_info
+        user = authenticate_request
+        if user
+          render json: {
+            email: user.email,
+            first_name: user.first_name,
+            last_name: user.last_name
+          }
+        else
+          render json: { error: "Unauthorized" }, status: :unauthorized
+        end
+      end
+
+      # Handles user logout
+      # Revokes the access token and associated refresh tokens
+      def logout
+        token = request.headers["Authorization"]&.split(" ")&.last
+        if token
+          access_token = OAuthAccessToken.find_by(token: token)
+          if access_token
+            access_token.revoke!
+            OAuthRefreshToken.where(user: access_token.user, o_auth_client: access_token.o_auth_client).update_all(revoked_at: Time.current)
+            render json: { message: "Logged out successfully" }
+          else
+            render json: { error: "Invalid token" }, status: :unauthorized
+          end
+        else
+          render json: { error: "No token provided" }, status: :bad_request
+        end
+      end
+
+      private
+
       # Handles the authorization code grant type
       # Verifies the code and creates access and refresh tokens
       def handle_authorization_code(client)
@@ -151,64 +209,6 @@ module Api
           scope: access_token.scopes.join(" ")
         }
       end
-
-      # Handles user login
-      # Authenticates the user and returns a JWT token
-      def login
-        user = User.find_by(email: params[:email])
-        if user&.authenticate(params[:password])
-          jwt_token = generate_jwt(user, ["read", "write"])
-          render json: { token: jwt_token }
-        else
-          render json: { error: "Invalid email or password" }, status: :unauthorized
-        end
-      end
-
-      # Handles user account creation
-      # Creates a new user and returns a JWT token
-      def create_account
-        user = User.new(user_params)
-        if user.save
-          jwt_token = generate_jwt(user, ["read", "write"])
-          render json: { token: jwt_token }, status: :created
-        else
-          render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
-        end
-      end
-
-      # Returns user information for the authenticated user
-      def user_info
-        user = authenticate_request
-        if user
-          render json: {
-            email: user.email,
-            first_name: user.first_name,
-            last_name: user.last_name
-          }
-        else
-          render json: { error: "Unauthorized" }, status: :unauthorized
-        end
-      end
-
-      # Handles user logout
-      # Revokes the access token and associated refresh tokens
-      def logout
-        token = request.headers["Authorization"]&.split(" ")&.last
-        if token
-          access_token = OAuthAccessToken.find_by(token: token)
-          if access_token
-            access_token.revoke!
-            OAuthRefreshToken.where(user: access_token.user, o_auth_client: access_token.o_auth_client).update_all(revoked_at: Time.current)
-            render json: { message: "Logged out successfully" }
-          else
-            render json: { error: "Invalid token" }, status: :unauthorized
-          end
-        else
-          render json: { error: "No token provided" }, status: :bad_request
-        end
-      end
-
-      private
 
       # Authenticates the OAuth client
       def authenticate_client
