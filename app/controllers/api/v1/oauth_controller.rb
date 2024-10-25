@@ -3,8 +3,6 @@ module Api
     class OauthController < ActionController::API
       # Handles the authorization request
       # Creates an authorization code if the client and redirect URI are valid
-      # Handles the authorization request
-      # Creates an authorization code if the client and redirect URI are valid
       def authorize
         # It performs the following steps:
         # 1. Validates the client and redirect URI
