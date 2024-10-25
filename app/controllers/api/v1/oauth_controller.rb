@@ -3,7 +3,14 @@ module Api
     class OauthController < ActionController::API
       # Handles the authorization request
       # Creates an authorization code if the client and redirect URI are valid
+      # Handles the authorization request
+      # Creates an authorization code if the client and redirect URI are valid
       def authorize
+        # It performs the following steps:
+        # 1. Validates the client and redirect URI
+        # 2. Creates an authorization code with various parameters
+        # 3. Redirects the user to the client's redirect URI with the authorization code
+        # If validation fails, it returns an error response
         client = OAuthClient.find_by(client_id: params[:client_id])
         if client && params[:redirect_uri] == client.redirect_uri
           auth_code = AuthorizationCode.create!(
@@ -25,6 +32,11 @@ module Api
       # Handles token requests
       # Supports authorization_code, refresh_token, and client_credentials grant types
       def token
+        # It performs the following steps:
+        # 1. Authenticates the client
+        # 2. Handles different grant types (authorization_code, refresh_token, client_credentials)
+        # 3. Calls the appropriate handler method based on the grant type
+        # If authentication fails or the grant type is unsupported, it returns an error response
         client = authenticate_client
         return unless client
 
@@ -42,6 +54,10 @@ module Api
 
       # Revokes the given access or refresh token
       def revoke
+        # It performs the following steps:
+        # 1. Finds the token (access or refresh) by the provided token value
+        # 2. If found, revokes the token by updating its revoked_at timestamp
+        # 3. Returns a success response if revoked, or an error if the token is not found
         token = OAuthAccessToken.find_by(token: params[:token]) || OAuthRefreshToken.find_by(token: params[:token])
         if token
           token.update!(revoked_at: Time.current)
@@ -54,6 +70,11 @@ module Api
       # Handles user login
       # Authenticates the user and returns a JWT token
       def login
+        # It performs the following steps:
+        # 1. Finds the user by email
+        # 2. Authenticates the user with the provided password
+        # 3. If authentication succeeds, generates a JWT token with read and write scopes
+        # 4. Returns the JWT token or an error response if authentication fails
         user = User.find_by(email: params[:email])
         if user&.authenticate(params[:password])
           jwt_token = generate_jwt(user, ["read", "write"])
@@ -66,6 +87,10 @@ module Api
       # Handles user account creation
       # Creates a new user and returns a JWT token
       def create_account
+        # It performs the following steps:
+        # 1. Creates a new user with the provided parameters
+        # 2. If the user is saved successfully, generates a JWT token with read and write scopes
+        # 3. Returns the JWT token or validation errors if user creation fails
         user = User.new(user_params)
         if user.save
           jwt_token = generate_jwt(user, ["read", "write"])
@@ -77,6 +102,10 @@ module Api
 
       # Returns user information for the authenticated user
       def user_info
+        # It performs the following steps:
+        # 1. Authenticates the request to get the current user
+        # 2. If authentication succeeds, returns the user's email, first name, and last name
+        # 3. If authentication fails, returns an unauthorized error response
         user = authenticate_request
         if user
           render json: {
@@ -92,6 +121,11 @@ module Api
       # Handles user logout
       # Revokes the access token and associated refresh tokens
       def logout
+        # It performs the following steps:
+        # 1. Extracts the access token from the Authorization header
+        # 2. Finds the corresponding access token in the database
+        # 3. If found, revokes the access token and associated refresh tokens for the user and client
+        # 4. Returns a success message or an error response if the token is invalid or not provided
         token = request.headers["Authorization"]&.split(" ")&.last
         if token
           access_token = OAuthAccessToken.find_by(token: token)
