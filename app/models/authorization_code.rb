@@ -18,10 +18,19 @@ class AuthorizationCode < ApplicationRecord
   belongs_to :user
   belongs_to :o_auth_client
 
-  validates :code, presence: true, uniqueness: true
-  validates :redirect_uri, :expires_at, :code_challenge, :code_challenge_method, presence: true
+  validates :code, presence: true
+  validates :redirect_uri, presence: true
+  validates :expires_at, presence: true
+  validates :code_challenge, presence: true, if: :pkce_required?
+  validates :code_challenge_method, presence: true, if: :pkce_required?
 
   def expired?
     expires_at < Time.current
+  end
+
+  private
+
+  def pkce_required?
+    code_challenge.present? || code_challenge_method.present?
   end
 end

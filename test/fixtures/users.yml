@@ -16,3 +16,15 @@ one:
 two:
   email: user2@example.com
   password_digest: <%= BCrypt::Password.create('password2') %>
+
+john:
+  email: john@example.com
+  first_name: John
+  last_name: Doe
+  password_digest: <%= BCrypt::Password.create('password123') %>
+
+jane:
+  email: jane@example.com
+  first_name: Jane
+  last_name: Doe
+  password_digest: <%= BCrypt::Password.create('password123') %>

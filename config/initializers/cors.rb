@@ -7,10 +7,11 @@
 
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
-    origins "localhost:3000"
-
-    resource "*",
+    origins 'localhost:3000' # NextJS default port
+    resource '*',
       headers: :any,
-      methods: [ :get, :post, :put, :patch, :delete, :options, :head ]
+      methods: [:get, :post, :put, :patch, :delete, :options, :head],
+      credentials: true,
+      expose: ['Authorization']
   end
 end

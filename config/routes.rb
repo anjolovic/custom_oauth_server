@@ -1,16 +1,26 @@
 Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
-      get "oauth/authorize", to: "oauth#authorize"
-      post "oauth/token", to: "oauth#token"
-      post "oauth/revoke", to: "oauth#revoke"
-      post "oauth/login", to: "oauth#login"
-      post "oauth/create_account", to: "oauth#create_account"
-      get "oauth/user_info", to: "oauth#user_info"
-      post "oauth/logout", to: "oauth#logout"
+      namespace :oauth do
+        resource :authorization, only: [:create] do
+          collection do
+            get :authorize, action: :new  # Changed this line
+          end
+        end
+        resources :tokens, only: [:create] do
+          collection do
+            post :revoke
+          end
+        end
+        resource :session, only: [:create] do
+          collection do
+            delete :destroy, as: 'destroy'
+          end
+        end
+        resources :users, only: [:create, :show]
+      end
     end
   end
-  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
