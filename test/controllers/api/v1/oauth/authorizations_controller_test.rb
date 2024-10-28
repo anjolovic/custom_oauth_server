@@ -7,16 +7,21 @@ module Api
         setup do
           @client = o_auth_clients(:valid)
           @user = users(:john)
-          @token = authenticate_as(@user, @client)
+          @access_token = OAuthAccessToken.create!(
+            token: SecureRandom.hex(32),
+            user: @user,
+            o_auth_client: @client,
+            expires_at: 1.hour.from_now,
+            scopes: ['read', 'write']
+          )
           @headers = { 
-            'Authorization': "Bearer #{@token}",
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Authorization': "Bearer #{@access_token.token}",
+            'Accept': 'application/json'
           }
         end
 
         test "creates authorization code with valid parameters" do
-          # Create access token for authentication
+          # Create a new access token for this specific test
           access_token = OAuthAccessToken.create!(
             token: SecureRandom.hex(32),
             user: @user,
@@ -24,6 +29,12 @@ module Api
             expires_at: 1.hour.from_now,
             scopes: ['read', 'write']
           )
+
+          auth_header = "Bearer #{access_token.token}"
+
+          # Verify token is valid before making request
+          assert AuthenticationService.verify_token(access_token.token), "Token should be valid"
+          assert_equal @user, AuthenticationService.authenticate_request(access_token.token), "Should authenticate user"
 
           get authorize_api_v1_oauth_authorization_path, 
             params: {
@@ -35,9 +46,18 @@ module Api
               state: "some_state"
             },
             headers: { 
-              'Authorization': "Bearer #{access_token.token}",
+              'Authorization': auth_header,
               'Accept': 'application/json'
             }
+
+          if response.status != 302
+            debug_response
+            puts "Authorization Header: #{auth_header}"
+            puts "Access Token Valid: #{access_token.expires_at > Time.current}"
+            puts "Access Token: #{access_token.inspect}"
+            puts "Current User from Token: #{AuthenticationService.authenticate_request(access_token.token)&.inspect}"
+            puts "Token Info: #{AuthenticationService.get_token_info(access_token.token)&.inspect}"
+          end
 
           assert_response :redirect
           assert_match /code=/, response.location
@@ -91,6 +111,9 @@ module Api
           puts "Response Body: #{response.body}"
           puts "Response Headers: #{response.headers}"
           puts "Request Headers: #{@headers}"
+          puts "Current User: #{@user.inspect}"
+          puts "Access Token: #{@access_token.inspect}"
+          puts "Authorization Header: #{@headers['Authorization']}"
         end
       end
     end

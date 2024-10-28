@@ -18,8 +18,12 @@ module Api
             }, status: :unauthorized
           end
 
+          # Get user from token if present
+          token = request.headers['Authorization']&.split(' ')&.last
+          @current_user = AuthenticationService.authenticate_request(token) if token
+
           # Then check authentication
-          unless current_user
+          unless @current_user
             # Store the OAuth params in session
             session[:oauth_params] = {
               client_id: params[:client_id],
@@ -43,7 +47,7 @@ module Api
             code_challenge: params[:code_challenge],
             code_challenge_method: params[:code_challenge_method],
             scope: params[:scope],
-            current_user: current_user
+            current_user: @current_user
           )
 
           if result.success?
