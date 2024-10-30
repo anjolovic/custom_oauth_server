@@ -1,5 +1,5 @@
 class UserService
-  Result = Struct.new(:success?, :token, :errors)
+  Result = Struct.new(:success?, :user, :token, :errors)
 
   def self.create(params)
     new(params).create
@@ -7,26 +7,33 @@ class UserService
 
   def initialize(params)
     @params = params
+    @client_id = params.delete(:client_id)
   end
 
   def create
     user = User.new(@params)
+    
     if user.save
-      token = generate_jwt(user, ["read", "write"])
-      Result.new(true, token, nil)
+      client = if @client_id
+                OAuthClient.find_by(client_id: @client_id)
+              else
+                OAuthClient.first
+              end
+
+      # Create access token for the new user
+      access_token = OAuthAccessToken.create!(
+        token: SecureRandom.hex(32),
+        user: user,
+        o_auth_client: client,
+        expires_at: 1.hour.from_now,
+        scopes: ['read', 'write']
+      )
+      
+      Result.new(true, user, access_token.token, nil)
     else
-      Result.new(false, nil, user.errors.full_messages)
+      Result.new(false, nil, nil, user.errors.full_messages)
     end
-  end
-
-  private
-
-  def generate_jwt(user, scopes)
-    payload = {
-      sub: user.id,
-      scopes: scopes,
-      exp: 1.hour.from_now.to_i
-    }
-    JWT.encode(payload, Rails.application.secret_key_base, "HS256")
+  rescue StandardError => e
+    Result.new(false, nil, nil, [e.message])
   end
 end

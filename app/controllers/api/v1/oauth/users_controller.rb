@@ -1,22 +1,32 @@
 module Api
   module V1
     module Oauth
-      class UsersController < ApplicationController
-        def create # formerly 'create_account' action
-          result = UserService.create(user_params)
+      class UsersController < BaseController
+        skip_before_action :authenticate_request, only: [:create]
+        
+        def create
+          result = UserService.create(
+            user_params.merge(client_id: params[:client_id])
+          )
 
           if result.success?
-            render json: { token: result.token }, status: :created
+            response.headers['Authorization'] = "Bearer #{result.token}"
+            
+            render json: {
+              token: result.token,
+              user: UserSerializer.new(result.user).as_json,
+              redirect_to: params[:return_to]
+            }, status: :created
           else
             render json: { errors: result.errors }, status: :unprocessable_entity
           end
         end
 
-        def show # formerly 'user_info' action
+        def show
           user = authenticate_request
           
           if user
-            render json: UserSerializer.new(user).as_json  # Consistent formatting
+            render json: UserSerializer.new(user).as_json
           else
             render json: { error: "Unauthorized" }, status: :unauthorized
           end
