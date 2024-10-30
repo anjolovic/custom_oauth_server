@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 # Rails and core dependencies
-gem "rails", "~> 8.0.0.beta1"
+gem "rails", "~> 8.0.0.rc2"
 gem "sqlite3", ">= 2.1"
 gem "puma", ">= 5.0"
 
